@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Click Counter</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #1e293b, #0f172a);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    padding: 24px;
+  }
+  .card {
+    background: #111827;
+    border: 1px solid #1f2937;
+    border-radius: 20px;
+    padding: 40px 48px;
+    text-align: center;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    width: 100%;
+    max-width: 480px;
+  }
+  h1 {
+    color: #94a3b8;
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin: 0 0 4px;
+  }
+  .subtitle {
+    color: #475569;
+    font-size: 12px;
+    margin-bottom: 28px;
+  }
+
+  /* Interval progress dots */
+  .dots { display: flex; justify-content: center; gap: 10px; margin-bottom: 24px; }
+  .dot {
+    width: 34px; height: 34px; border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 13px; font-weight: 700; color: #64748b;
+    background: #1f2937; border: 2px solid #334155;
+  }
+  .dot.active { border-color: #4ade80; color: #4ade80; }
+  .dot.done { background: #14532d; border-color: #4ade80; color: #bbf7d0; }
+
+  #count {
+    font-size: 84px;
+    font-weight: 800;
+    color: #ffffff;
+    margin: 4px 0;
+    line-height: 1;
+    transition: transform 0.15s ease;
+  }
+  #count.bump { transform: scale(1.1); color: #4ade80; }
+
+  .meta {
+    color: #64748b;
+    font-size: 13px;
+    margin-bottom: 24px;
+    min-height: 18px;
+  }
+  .meta b { color: #cbd5e1; }
+
+  button.primary {
+    width: 100%;
+    background: #22c55e;
+    color: #052e12;
+    border: none;
+    padding: 14px 18px;
+    border-radius: 12px;
+    font-size: 16px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: background 0.15s ease;
+  }
+  button.primary:hover { background: #16a34a; }
+  button.primary:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
+
+  .btn-row { margin-top: 14px; display: flex; gap: 10px; justify-content: center; }
+  button.secondary {
+    background: transparent;
+    color: #64748b;
+    border: 1px solid #334155;
+    padding: 8px 14px;
+    border-radius: 10px;
+    font-size: 12px;
+    cursor: pointer;
+  }
+  button.secondary:hover { color: #e2e8f0; border-color: #475569; }
+  button.secondary.danger:hover { color: #fca5a5; border-color: #7f1d1d; }
+
+  /* Summary table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    font-size: 14px;
+  }
+  th, td {
+    padding: 10px 8px;
+    text-align: left;
+    border-bottom: 1px solid #1f2937;
+    color: #cbd5e1;
+  }
+  th { color: #64748b; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+  tfoot td {
+    font-weight: 800;
+    color: #4ade80;
+    font-size: 18px;
+    border-bottom: none;
+    border-top: 2px solid #334155;
+    padding-top: 14px;
+  }
+  .status { margin-top: 16px; font-size: 12px; color: #475569; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>Click Counter</h1>
+
+    <div class="dots" id="dots">
+      <div class="dot" data-n="1">1</div>
+      <div class="dot" data-n="2">2</div>
+      <div class="dot" data-n="3">EOD</div>
+    </div>
+
+    <!-- Live tracking view -->
+    <div id="liveView">
+      <p id="count">0</p>
+      <div class="meta" id="meta"></div> 
+      <button class="primary" id="actionBtn">Start Shift</button>
+      <div class="btn-row">
+        <button class="secondary" id="refreshBtn">Refresh Count</button>
+        <button class="secondary danger" id="resetBtn">Reset Shift</button>
+      </div>
+
+      <!-- Completed intervals so far, stays visible while working on the current one -->
+      <table id="completedTable" style="display:none; margin-top:26px;">
+        <thead>
+          <tr><th>Interval</th><th>Start</th><th>End</th><th>Count</th></tr>
+        </thead>
+        <tbody id="completedBody"></tbody>
+      </table>
+    </div>
+
+    <!-- Final summary view -->
+    <div id="summaryView" style="display:none;">
+      <div class="meta" id="shiftRange" style="margin-bottom:16px;"></div>
+      <table>
+        <thead>
+          <tr><th>Interval</th><th>Start</th><th>End</th><th>Count</th></tr>
+        </thead>
+        <tbody id="summaryBody"></tbody>
+        <tfoot>
+          <tr><td colspan="3">Shift Total</td><td id="grandTotal">0</td></tr>
+        </tfoot>
+      </table>
+      <div class="btn-row" style="margin-top:20px;">
+        <button class="secondary danger" id="newShiftBtn">Start New Shift</button>
+      </div>
+    </div>
+
+    <div class="status" id="status">Connecting…</div>
+  </div>
+
+<script>
+  // ===== CONFIG (must match the snippet on your website) =====
+  const NAMESPACE = "my-site-click-counter-8f2a1c";
+  const KEY = "submit-clicks";
+  // =============================================================
+
+  const STORAGE_KEY = "shift-state";
+
+  const countEl = document.getElementById("count");
+  const metaEl = document.getElementById("meta");
+  const statusEl = document.getElementById("status");
+  const actionBtn = document.getElementById("actionBtn");
+  const liveView = document.getElementById("liveView");
+  const summaryView = document.getElementById("summaryView");
+  const summaryBody = document.getElementById("summaryBody");
+  const grandTotalEl = document.getElementById("grandTotal");
+  const dots = document.querySelectorAll(".dot");
+  const completedTable = document.getElementById("completedTable");
+  const completedBody = document.getElementById("completedBody");
+  const shiftRangeEl = document.getElementById("shiftRange");
+
+  // Default / in-memory state
+  let state = {
+    phase: "idle",        // idle -> running -> (repeat) -> done
+    currentInterval: 1,    // 1, 2, or 3
+    baselineCount: 0,      // master counter value when this interval started
+    startTime: null,       // ISO string for current interval's start
+    intervals: []           // [{number, startTime, count}]
+  };
+
+  let latestMasterCount = 0;
+
+  function fmtTime(iso) {
+    if (!iso) return "--";
+    const d = new Date(iso);
+    return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+  }
+
+  async function saveState() {
+    try {
+      await window.storage.set(STORAGE_KEY, JSON.stringify(state), false);
+    } catch (e) {
+      console.warn("Could not save shift state:", e);
+    }
+  }
+
+  async function loadState() {
+    try {
+      const result = await window.storage.get(STORAGE_KEY, false);
+      if (result && result.value) {
+        state = JSON.parse(result.value);
+      }
+    } catch (e) {
+      // No saved state yet — that's fine, use defaults
+    }
+  }
+
+  function updateDots() {
+    dots.forEach(dot => {
+      const n = parseInt(dot.dataset.n, 10);
+      dot.classList.remove("active", "done");
+      if (state.intervals.find(iv => iv.number === n)) {
+        dot.classList.add("done");
+      } else if (n === state.currentInterval && state.phase === "running") {
+        dot.classList.add("active");
+      }
+    });
+  }
+
+  function renderSummary() {
+    summaryBody.innerHTML = "";
+    let total = 0;
+    state.intervals.forEach(iv => {
+      total += iv.count;
+      const row = document.createElement("tr");
+      row.innerHTML = `<td>Interval ${iv.number}</td><td>${fmtTime(iv.startTime)}</td><td>${fmtTime(iv.endTime)}</td><td>${iv.count}</td>`;
+      summaryBody.appendChild(row);
+    });
+    grandTotalEl.textContent = total;
+
+    const shiftStart = state.intervals[0]?.startTime;
+    const shiftEnd = state.intervals[state.intervals.length - 1]?.endTime;
+    shiftRangeEl.innerHTML = `Shift Start: <b>${fmtTime(shiftStart)}</b> &nbsp;·&nbsp; Shift End: <b>${fmtTime(shiftEnd)}</b>`;
+
+    liveView.style.display = "none";
+    summaryView.style.display = "block";
+  }
+
+  function renderCompletedTable() {
+    if (state.intervals.length === 0) {
+      completedTable.style.display = "none";
+      return;
+    }
+    completedBody.innerHTML = "";
+    state.intervals.forEach(iv => {
+      const row = document.createElement("tr");
+      row.innerHTML = `<td>Interval ${iv.number}</td><td>${fmtTime(iv.startTime)}</td><td>${fmtTime(iv.endTime)}</td><td>${iv.count}</td>`;
+      completedBody.appendChild(row);
+    });
+    completedTable.style.display = "table";
+  }
+
+  function renderLive() {
+    liveView.style.display = "block";
+    summaryView.style.display = "none";
+    renderCompletedTable();
+
+    if (state.phase === "idle") {
+      countEl.textContent = "0";
+      const prev = state.intervals[state.intervals.length - 1];
+      metaEl.innerHTML = prev
+        ? `Interval ${prev.number} ended at <b>${fmtTime(prev.endTime)}</b> · Ready to start Interval ${state.currentInterval}`
+        : `Ready to start Interval ${state.currentInterval}`;
+      actionBtn.textContent = `Start Interval ${state.currentInterval}`;
+      actionBtn.disabled = false;
+    } else if (state.phase === "running") {
+      const live = Math.max(0, latestMasterCount - state.baselineCount);
+      countEl.textContent = live;
+      metaEl.innerHTML = `Interval ${state.currentInterval} · Started at <b>${fmtTime(state.startTime)}</b>`;
+      actionBtn.textContent = `Submit Interval ${state.currentInterval}`;
+      actionBtn.disabled = false;
+    }
+    updateDots();
+  }
+
+  function render() {
+    if (state.phase === "done") {
+      renderSummary();
+    } else {
+      renderLive();
+    }
+  }
+
+  async function fetchMasterCount() {
+    try {
+      const res = await fetch(`https://api.countapi.xyz/get/${NAMESPACE}/${KEY}`);
+      const data = await res.json();
+      const newVal = data.value ?? 0;
+      if (newVal !== latestMasterCount) {
+        latestMasterCount = newVal;
+        if (state.phase === "running") {
+          countEl.classList.add("bump");
+          setTimeout(() => countEl.classList.remove("bump"), 150);
+        }
+      }
+      statusEl.textContent = "Live — syncing with your website";
+      if (state.phase === "running") render();
+    } catch (e) {
+      statusEl.textContent = "Couldn't reach counter service. Retrying…";
+    }
+  }
+
+  async function handleActionClick() {
+    if (state.phase === "idle") {
+      // Start this interval
+      state.phase = "running";
+      state.baselineCount = latestMasterCount;
+      state.startTime = new Date().toISOString();
+      await saveState();
+      render();
+    } else if (state.phase === "running") {
+      // Submit this interval
+      const count = Math.max(0, latestMasterCount - state.baselineCount);
+      state.intervals.push({
+        number: state.currentInterval,
+        startTime: state.startTime,
+        endTime: new Date().toISOString(),
+        count: count
+      });
+
+      if (state.currentInterval >= 3) {
+        state.phase = "done";
+      } else {
+        state.currentInterval += 1;
+        state.phase = "idle";
+      }
+      await saveState();
+      render();
+    }
+  }
+
+  async function resetShift() {
+    if (!confirm("Reset the current shift? This clears all recorded intervals.")) return;
+    state = { phase: "idle", currentInterval: 1, baselineCount: latestMasterCount, startTime: null, intervals: [] };
+    await saveState();
+    render();
+  }
+
+  actionBtn.addEventListener("click", handleActionClick);
+  document.getElementById("refreshBtn").addEventListener("click", fetchMasterCount);
+  document.getElementById("resetBtn").addEventListener("click", resetShift);
+  document.getElementById("newShiftBtn").addEventListener("click", resetShift);
+
+  (async function init() {
+    await loadState();
+    await fetchMasterCount();
+    render();
+    setInterval(fetchMasterCount, 3000);
+  })();
+</script>
+</body>
+</html>
