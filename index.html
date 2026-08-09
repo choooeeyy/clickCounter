@@ -32,14 +32,15 @@
     letter-spacing: 2px;
     text-transform: uppercase;
     margin: 0 0 4px;
+    text-align: center;
   }
   .subtitle {
     color: #475569;
     font-size: 12px;
     margin-bottom: 28px;
+    text-align: center;
   }
 
-  /* Interval progress dots */
   .dots { display: flex; justify-content: center; gap: 10px; margin-bottom: 24px; }
   .dot {
     width: 34px; height: 34px; border-radius: 50%;
@@ -50,26 +51,56 @@
   .dot.active { border-color: #4ade80; color: #4ade80; }
   .dot.done { background: #14532d; border-color: #4ade80; color: #bbf7d0; }
 
+  .counter-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    margin: 10px 0 4px;
+  }
+  .stepper {
+    width: 56px; height: 56px;
+    border-radius: 50%;
+    border: none;
+    font-size: 30px;
+    font-weight: 700;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: transform 0.1s ease, background 0.15s ease;
+  }
+  .stepper:active { transform: scale(0.92); }
+  .stepper.plus { background: #22c55e; color: #052e12; }
+  .stepper.plus:hover { background: #16a34a; }
+  .stepper.minus { background: #1f2937; color: #f87171; border: 1px solid #334155; }
+  .stepper.minus:hover { background: #334155; }
+  .stepper:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
   #count {
-    font-size: 84px;
+    font-size: 72px;
     font-weight: 800;
     color: #ffffff;
-    margin: 4px 0;
+    margin: 0;
     line-height: 1;
-    transition: transform 0.15s ease;
+    min-width: 110px;
+    transition: transform 0.12s ease;
   }
-  #count.bump { transform: scale(1.1); color: #4ade80; }
+  #count.bump-up { transform: scale(1.1); color: #4ade80; }
+  #count.bump-down { transform: scale(1.1); color: #f87171; }
 
   .meta {
     color: #64748b;
     font-size: 13px;
-    margin-bottom: 24px;
+    margin: 20px 0 20px;
     min-height: 18px;
   }
   .meta b { color: #cbd5e1; }
 
   button.primary {
+    display: block;
     width: 100%;
+    margin: 0 auto;
     background: #22c55e;
     color: #052e12;
     border: none;
@@ -96,7 +127,6 @@
   button.secondary:hover { color: #e2e8f0; border-color: #475569; }
   button.secondary.danger:hover { color: #fca5a5; border-color: #7f1d1d; }
 
-  /* Summary table */
   table {
     width: 100%;
     border-collapse: collapse;
@@ -118,12 +148,91 @@
     border-top: 2px solid #334155;
     padding-top: 14px;
   }
-  .status { margin-top: 16px; font-size: 12px; color: #475569; }
+
+  @media (max-width: 340px) {
+    .card { padding: 28px 20px; }
+    h1 { font-size: 13px; letter-spacing: 1.5px; }
+    .subtitle { font-size: 11px; margin-bottom: 20px; }
+    .dots { gap: 6px; margin-bottom: 18px; }
+    .dot { width: 28px; height: 28px; font-size: 11px; }
+    .counter-row { flex-wrap: wrap; gap: 12px; }
+    #count { order: -1; width: 100%; font-size: 56px; min-width: 80px; margin-bottom: 4px; }
+    .stepper.minus { order: 1; }
+    .stepper.plus { order: 2; }
+    .stepper { width: 46px; height: 46px; font-size: 24px; }
+    table, th, td { font-size: 12px; }
+    button.primary {
+      width: auto;
+      min-width: unset;
+      padding: 8px 14px;
+      font-size: 12px;
+      border-radius: 10px;
+      font-weight: 600;
+    }
+    .detail-text { display: none; }
+    #summaryView table,
+    #completedTable { display: none !important; }
+  }
+
+  /* EOD Summary popup */
+  .eod-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+  }
+  .eod-modal {
+    position: relative;
+    background: #111827;
+    border: 1px solid #1f2937;
+    border-radius: 18px;
+    padding: 32px 28px;
+    width: 100%;
+    max-width: 340px;
+    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
+    text-align: center;
+  }
+  .eod-heading {
+    color: #4ade80;
+    font-size: 20px;
+    font-weight: 800;
+    letter-spacing: 1px;
+    margin-bottom: 22px;
+  }
+  .eod-text {
+    text-align: left;
+    color: #e2e8f0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+    white-space: pre-wrap;
+    margin: 8px 0 20px;
+  }
+  .eod-copy-btn {
+    width: 100%;
+  }
+  .eod-close {
+    position: absolute;
+    top: 10px;
+    right: 14px;
+    background: none;
+    border: none;
+    color: #64748b;
+    font-size: 22px;
+    line-height: 1;
+    cursor: pointer;
+  }
+  .eod-close:hover { color: #e2e8f0; }
 </style>
 </head>
 <body>
   <div class="card">
     <h1>Click Counter</h1>
+    <div class="subtitle"></div>
 
     <div class="dots" id="dots">
       <div class="dot" data-n="1">1</div>
@@ -133,11 +242,14 @@
 
     <!-- Live tracking view -->
     <div id="liveView">
-      <p id="count">0</p>
-      <div class="meta" id="meta"></div> 
-      <button class="primary" id="actionBtn">Start Shift</button>
+      <div class="counter-row">
+        <button class="stepper minus" id="minusBtn">−</button>
+        <p id="count">0</p>
+        <button class="stepper plus" id="plusBtn">+</button>
+      </div>
+      <div class="meta" id="meta"><span class="detail-text"></span></div>
+      <button class="primary" id="actionBtn">End<span class="detail-text"> Interval 1</span></button>
       <div class="btn-row">
-        <button class="secondary" id="refreshBtn">Refresh Count</button>
         <button class="secondary danger" id="resetBtn">Reset Shift</button>
       </div>
 
@@ -147,6 +259,9 @@
           <tr><th>Interval</th><th>Start</th><th>End</th><th>Count</th></tr>
         </thead>
         <tbody id="completedBody"></tbody>
+        <tfoot>
+          <tr><td colspan="3">Partial Total</td><td id="partialTotal">0</td></tr>
+        </tfoot>
       </table>
     </div>
 
@@ -159,29 +274,33 @@
         </thead>
         <tbody id="summaryBody"></tbody>
         <tfoot>
-          <tr><td colspan="3">Shift Total</td><td id="grandTotal">0</td></tr>
+          <tr><td colspan="3">Total Task Finished</td><td id="grandTotal">0</td></tr>
         </tfoot>
       </table>
-      <div class="btn-row" style="margin-top:20px;">
+      <div class="btn-row" style="margin-top:20px; flex-direction:column; gap:10px;">
+        <button class="secondary" id="eodSummaryBtn">EOD Summary</button>
         <button class="secondary danger" id="newShiftBtn">Start New Shift</button>
       </div>
     </div>
+  </div>
 
-    <div class="status" id="status">Connecting…</div>
+  <!-- EOD Summary popup -->
+  <div id="eodOverlay" class="eod-overlay" style="display:none;">
+    <div class="eod-modal">
+      <button class="eod-close" id="eodCloseBtn">&times;</button>
+      <pre id="eodText" class="eod-text"></pre>
+      <button class="secondary eod-copy-btn" id="eodCopyBtn">Copy</button>
+    </div>
   </div>
 
 <script>
-  // ===== CONFIG (must match the snippet on your website) =====
-  const NAMESPACE = "my-site-click-counter-8f2a1c";
-  const KEY = "submit-clicks";
-  // =============================================================
-
-  const STORAGE_KEY = "shift-state";
+  const STORAGE_KEY = "shift-state-manual";
 
   const countEl = document.getElementById("count");
   const metaEl = document.getElementById("meta");
-  const statusEl = document.getElementById("status");
   const actionBtn = document.getElementById("actionBtn");
+  const plusBtn = document.getElementById("plusBtn");
+  const minusBtn = document.getElementById("minusBtn");
   const liveView = document.getElementById("liveView");
   const summaryView = document.getElementById("summaryView");
   const summaryBody = document.getElementById("summaryBody");
@@ -189,18 +308,19 @@
   const dots = document.querySelectorAll(".dot");
   const completedTable = document.getElementById("completedTable");
   const completedBody = document.getElementById("completedBody");
+  const partialTotalEl = document.getElementById("partialTotal");
   const shiftRangeEl = document.getElementById("shiftRange");
+  const eodOverlay = document.getElementById("eodOverlay");
+  const eodTextEl = document.getElementById("eodText");
+  const eodCopyBtn = document.getElementById("eodCopyBtn");
 
-  // Default / in-memory state
   let state = {
-    phase: "idle",        // idle -> running -> (repeat) -> done
-    currentInterval: 1,    // 1, 2, or 3
-    baselineCount: 0,      // master counter value when this interval started
-    startTime: null,       // ISO string for current interval's start
-    intervals: []           // [{number, startTime, count}]
+    phase: "notStarted", // notStarted -> running -> (repeat per interval) -> done
+    currentInterval: 1,
+    liveCount: 0,
+    startTime: null,
+    intervals: []
   };
-
-  let latestMasterCount = 0;
 
   function fmtTime(iso) {
     if (!iso) return "--";
@@ -223,7 +343,7 @@
         state = JSON.parse(result.value);
       }
     } catch (e) {
-      // No saved state yet — that's fine, use defaults
+      // No saved state yet — use defaults
     }
   }
 
@@ -237,6 +357,27 @@
         dot.classList.add("active");
       }
     });
+  }
+
+  function renderCompletedTable() {
+    const showTable = state.intervals.length > 0 || state.phase === "running";
+    if (!showTable) {
+      completedTable.style.display = "none";
+      return;
+    }
+    completedBody.innerHTML = "";
+    let partial = 0;
+    state.intervals.forEach(iv => {
+      partial += iv.count;
+      const row = document.createElement("tr");
+      row.innerHTML = `<td>Interval ${iv.number}</td><td>${fmtTime(iv.startTime)}</td><td>${fmtTime(iv.endTime)}</td><td>${iv.count}</td>`;
+      completedBody.appendChild(row);
+    });
+    if (state.phase === "running") {
+      partial += state.liveCount; // include the interval currently in progress
+    }
+    partialTotalEl.textContent = partial;
+    completedTable.style.display = "table";
   }
 
   function renderSummary() {
@@ -258,39 +399,31 @@
     summaryView.style.display = "block";
   }
 
-  function renderCompletedTable() {
-    if (state.intervals.length === 0) {
-      completedTable.style.display = "none";
-      return;
-    }
-    completedBody.innerHTML = "";
-    state.intervals.forEach(iv => {
-      const row = document.createElement("tr");
-      row.innerHTML = `<td>Interval ${iv.number}</td><td>${fmtTime(iv.startTime)}</td><td>${fmtTime(iv.endTime)}</td><td>${iv.count}</td>`;
-      completedBody.appendChild(row);
-    });
-    completedTable.style.display = "table";
-  }
-
   function renderLive() {
     liveView.style.display = "block";
     summaryView.style.display = "none";
     renderCompletedTable();
 
-    if (state.phase === "idle") {
+    if (state.phase === "notStarted") {
       countEl.textContent = "0";
-      const prev = state.intervals[state.intervals.length - 1];
+      const startHint = `<span class="detail-text"> </span>`;
       metaEl.innerHTML = prev
-        ? `Interval ${prev.number} ended at <b>${fmtTime(prev.endTime)}</b> · Ready to start Interval ${state.currentInterval}`
-        : `Ready to start Interval ${state.currentInterval}`;
-      actionBtn.textContent = `Start Interval ${state.currentInterval}`;
-      actionBtn.disabled = false;
+        ? `Interval ${prev.number} ended at <b>${fmtTime(prev.endTime)}</b> <span class="detail-text">· Tap + to start Interval ${state.currentInterval}</span>`
+        : startHint;
+      actionBtn.innerHTML = state.currentInterval >= 3
+        ? `End<span class="detail-text"> of Shift</span>`
+        : `End<span class="detail-text"> Interval ${state.currentInterval}</span>`;
+      actionBtn.disabled = true;
+      plusBtn.disabled = false;
+      minusBtn.disabled = true;
     } else if (state.phase === "running") {
-      const live = Math.max(0, latestMasterCount - state.baselineCount);
-      countEl.textContent = live;
-      metaEl.innerHTML = `Interval ${state.currentInterval} · Started at <b>${fmtTime(state.startTime)}</b>`;
-      actionBtn.textContent = `Submit Interval ${state.currentInterval}`;
+      countEl.textContent = state.liveCount;
+      actionBtn.innerHTML = state.currentInterval >= 3
+        ? `End<span class="detail-text"> of Shift</span>`
+        : `End<span class="detail-text"> Interval ${state.currentInterval}</span>`;
       actionBtn.disabled = false;
+      plusBtn.disabled = false;
+      minusBtn.disabled = false;
     }
     updateDots();
   }
@@ -303,71 +436,131 @@
     }
   }
 
-  async function fetchMasterCount() {
-    try {
-      const res = await fetch(`https://api.countapi.xyz/get/${NAMESPACE}/${KEY}`);
-      const data = await res.json();
-      const newVal = data.value ?? 0;
-      if (newVal !== latestMasterCount) {
-        latestMasterCount = newVal;
-        if (state.phase === "running") {
-          countEl.classList.add("bump");
-          setTimeout(() => countEl.classList.remove("bump"), 150);
-        }
-      }
-      statusEl.textContent = "Live — syncing with your website";
-      if (state.phase === "running") render();
-    } catch (e) {
-      statusEl.textContent = "Couldn't reach counter service. Retrying…";
+  function bump(direction) {
+    countEl.classList.remove("bump-up", "bump-down");
+    void countEl.offsetWidth;
+    countEl.classList.add(direction === "up" ? "bump-up" : "bump-down");
+    setTimeout(() => countEl.classList.remove("bump-up", "bump-down"), 120);
+  }
+
+  async function increment() {
+    if (state.phase === "notStarted") {
+      // First tap of + starts this interval (and the shift, if this is Interval 1)
+      state.phase = "running";
+      state.startTime = new Date().toISOString();
     }
+    state.liveCount += 1;
+    render();
+    bump("up");
+    await saveState();
+  }
+
+  async function decrement() {
+    if (state.phase !== "running") return;
+    if (state.liveCount <= 0) return;
+    state.liveCount -= 1;
+    render();
+    bump("down");
+    await saveState();
   }
 
   async function handleActionClick() {
-    if (state.phase === "idle") {
-      // Start this interval
-      state.phase = "running";
-      state.baselineCount = latestMasterCount;
-      state.startTime = new Date().toISOString();
-      await saveState();
-      render();
-    } else if (state.phase === "running") {
-      // Submit this interval
-      const count = Math.max(0, latestMasterCount - state.baselineCount);
-      state.intervals.push({
-        number: state.currentInterval,
-        startTime: state.startTime,
-        endTime: new Date().toISOString(),
-        count: count
-      });
+    if (state.phase !== "running") return; // nothing to end yet
 
-      if (state.currentInterval >= 3) {
-        state.phase = "done";
-      } else {
-        state.currentInterval += 1;
-        state.phase = "idle";
-      }
-      await saveState();
-      render();
+    // End the current interval
+    state.intervals.push({
+      number: state.currentInterval,
+      startTime: state.startTime,
+      endTime: new Date().toISOString(),
+      count: state.liveCount
+    });
+
+    if (state.currentInterval >= 3) {
+      state.phase = "done"; // End of Shift
+    } else {
+      state.currentInterval += 1;
+      state.phase = "notStarted";
     }
-  }
-
-  async function resetShift() {
-    if (!confirm("Reset the current shift? This clears all recorded intervals.")) return;
-    state = { phase: "idle", currentInterval: 1, baselineCount: latestMasterCount, startTime: null, intervals: [] };
+    state.liveCount = 0;
+    state.startTime = null;
     await saveState();
     render();
   }
 
+  async function resetShift() {
+    if (!confirm("Reset the current shift? This clears all recorded intervals.")) return;
+    state = { phase: "notStarted", currentInterval: 1, liveCount: 0, startTime: null, intervals: [] };
+    await saveState();
+    render();
+  }
+
+  function fmtDate(iso) {
+    const d = iso ? new Date(iso) : new Date();
+    return d.toLocaleDateString(); 
+  }
+
+  function openEodSummary() {
+    const shiftStart = state.intervals[0]?.startTime;
+    const shiftEnd = state.intervals[state.intervals.length - 1]?.endTime;
+    const total = state.intervals.reduce((sum, iv) => sum + iv.count, 0);
+
+    const text = [
+      "EOD OOS CWH POD 0",
+      fmtDate(shiftStart),
+      `Time Started : 11:30 AM`,
+      `Time Finished : 5:30 PM`,
+      `Tasks Done/Finished: ${total}`
+    ].join("\n");
+
+    eodTextEl.textContent = text;
+    eodCopyBtn.textContent = "Copy";
+    eodOverlay.style.display = "flex";
+  }
+
+  function closeEodSummary() {
+    eodOverlay.style.display = "none";
+  }
+
+  async function copyEodText() {
+    const text = eodTextEl.textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (e) {
+      // Fallback for environments where the Clipboard API is blocked
+      const temp = document.createElement("textarea");
+      temp.value = text;
+      temp.style.position = "fixed";
+      temp.style.opacity = "0";
+      document.body.appendChild(temp);
+      temp.focus();
+      temp.select();
+      try {
+        document.execCommand("copy");
+      } catch (err) {
+        console.warn("Copy failed:", err);
+      }
+      document.body.removeChild(temp);
+    }
+    eodCopyBtn.textContent = "Copied!";
+    setTimeout(() => { eodCopyBtn.textContent = "Copy"; }, 1500);
+  }
+
+  document.getElementById("eodSummaryBtn").addEventListener("click", openEodSummary);
+  document.getElementById("eodCloseBtn").addEventListener("click", closeEodSummary);
+  eodCopyBtn.addEventListener("click", copyEodText);
+  eodOverlay.addEventListener("click", (e) => {
+    if (e.target === eodOverlay) closeEodSummary();
+  });
+
+  plusBtn.addEventListener("click", increment);
+  minusBtn.addEventListener("click", decrement);
   actionBtn.addEventListener("click", handleActionClick);
-  document.getElementById("refreshBtn").addEventListener("click", fetchMasterCount);
   document.getElementById("resetBtn").addEventListener("click", resetShift);
   document.getElementById("newShiftBtn").addEventListener("click", resetShift);
 
   (async function init() {
     await loadState();
-    await fetchMasterCount();
     render();
-    setInterval(fetchMasterCount, 3000);
   })();
 </script>
 </body>
