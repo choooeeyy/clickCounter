@@ -351,13 +351,12 @@
   }
 
   // --- Debounced saving ---
-  // Writing to storage on every single tap can outrun the storage backend's
-  // rate limit, which is what caused "Save failed" during rapid clicking.
-  // Instead we batch rapid taps into one write, and always flush immediately
-  // at meaningful checkpoints (ending an interval, resetting, closing the tab).
+  // localStorage writes are synchronous and local to the browser, so there's
+  // no real risk of "rate limiting" here — but we still batch rapid taps to
+  // avoid needless writes, and always flush at meaningful checkpoints.
   let saveTimer = null;
   let pendingSave = false;
-  const SAVE_DEBOUNCE_MS = 700;
+  const SAVE_DEBOUNCE_MS = 400;
 
   function scheduleSave() {
     pendingSave = true;
@@ -365,32 +364,36 @@
     saveTimer = setTimeout(flushSave, SAVE_DEBOUNCE_MS);
   }
 
-  async function flushSave() {
+  function flushSave() {
     clearTimeout(saveTimer);
     if (!pendingSave) return;
     pendingSave = false;
     try {
-      const result = await window.storage.set(STORAGE_KEY, JSON.stringify(state), false);
-      if (result) {
-        flashSaveIndicator("Saved");
-      } else {
-        flashSaveIndicator("Save failed — retrying...");
-        pendingSave = true;
-        saveTimer = setTimeout(flushSave, SAVE_DEBOUNCE_MS * 2);
-      }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      flashSaveIndicator("Saved");
     } catch (e) {
       console.warn("Could not save shift state:", e);
-      flashSaveIndicator("Save failed — retrying...");
-      pendingSave = true;
-      saveTimer = setTimeout(flushSave, SAVE_DEBOUNCE_MS * 2);
+      flashSaveIndicator("Save failed — storage may be full or blocked");
     }
   }
 
-  // Keep the old name working anywhere it's still referenced, but route it
-  // through an immediate flush instead of a raw write.
+  // Keep the old name working anywhere it's still referenced.
   async function saveState() {
     pendingSave = true;
-    await flushSave();
+    flushSave();
+  }
+
+  function loadState() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        state = JSON.parse(raw);
+      }
+    } catch (e) {
+      // No saved state yet, or it was corrupted — use defaults
+    } finally {
+      stateLoaded = true;
+    }
   }
 
   // Best-effort save if the tab is closed or backgrounded while a save is pending.
@@ -404,19 +407,6 @@
       flushSave();
     }
   });
-
-  async function loadState() {
-    try {
-      const result = await window.storage.get(STORAGE_KEY, false);
-      if (result && result.value) {
-        state = JSON.parse(result.value);
-      }
-    } catch (e) {
-      // No saved state yet — use defaults
-    } finally {
-      stateLoaded = true;
-    }
-  }
 
   function updateDots() {
     dots.forEach(dot => {
@@ -634,9 +624,8 @@
   document.getElementById("resetBtn").addEventListener("click", resetShift);
   document.getElementById("newShiftBtn").addEventListener("click", resetShift);
 
-  (async function init() {
-    saveIndicator.textContent = "Loading your saved progress...";
-    await loadState();
+  (function init() {
+    loadState();
     render();
     saveIndicator.textContent = "Progress saved automatically";
   })();
