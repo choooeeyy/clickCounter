@@ -97,6 +97,16 @@
   }
   .meta b { color: #cbd5e1; }
 
+  .save-indicator {
+    color: #4ade80;
+    font-size: 11px;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    margin-bottom: 6px;
+    min-height: 14px;
+  }
+  .save-indicator.show { opacity: 1; }
+
   button.primary {
     display: block;
     width: 100%;
@@ -232,7 +242,7 @@
 <body>
   <div class="card">
     <h1>Click Counter</h1>
-    <div class="subtitle"></div>
+    <div class="subtitle" id="saveIndicator">Progress saved automatically</div>
 
     <div class="dots" id="dots">
       <div class="dot" data-n="1">1</div>
@@ -313,6 +323,7 @@
   const eodOverlay = document.getElementById("eodOverlay");
   const eodTextEl = document.getElementById("eodText");
   const eodCopyBtn = document.getElementById("eodCopyBtn");
+  const saveIndicator = document.getElementById("saveIndicator");
 
   let state = {
     phase: "notStarted", // notStarted -> running -> (repeat per interval) -> done
@@ -322,17 +333,34 @@
     intervals: []
   };
 
+  let stateLoaded = false; // guard so we don't overwrite saved data before it's loaded
+
   function fmtTime(iso) {
     if (!iso) return "--";
     const d = new Date(iso);
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
 
+  function flashSaveIndicator(text) {
+    saveIndicator.textContent = text;
+    saveIndicator.classList.add("show");
+    clearTimeout(flashSaveIndicator._t);
+    flashSaveIndicator._t = setTimeout(() => {
+      saveIndicator.classList.remove("show");
+    }, 1200);
+  }
+
   async function saveState() {
     try {
-      await window.storage.set(STORAGE_KEY, JSON.stringify(state), false);
+      const result = await window.storage.set(STORAGE_KEY, JSON.stringify(state), false);
+      if (result) {
+        flashSaveIndicator("Saved");
+      } else {
+        flashSaveIndicator("Save failed — check connection");
+      }
     } catch (e) {
       console.warn("Could not save shift state:", e);
+      flashSaveIndicator("Save failed — check connection");
     }
   }
 
@@ -344,6 +372,8 @@
       }
     } catch (e) {
       // No saved state yet — use defaults
+    } finally {
+      stateLoaded = true;
     }
   }
 
@@ -403,6 +433,8 @@
     liveView.style.display = "block";
     summaryView.style.display = "none";
     renderCompletedTable();
+
+    // Most recently completed interval, if any — used for the "notStarted" hint text.
 
     if (state.phase === "notStarted") {
       countEl.textContent = "0";
@@ -559,9 +591,12 @@
   document.getElementById("newShiftBtn").addEventListener("click", resetShift);
 
   (async function init() {
+    saveIndicator.textContent = "Loading your saved progress...";
     await loadState();
     render();
+    saveIndicator.textContent = "Progress saved automatically";
   })();
+
 </script>
 </body>
 </html>
