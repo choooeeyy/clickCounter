@@ -350,19 +350,60 @@
     }, 1200);
   }
 
-  async function saveState() {
+  // --- Debounced saving ---
+  // Writing to storage on every single tap can outrun the storage backend's
+  // rate limit, which is what caused "Save failed" during rapid clicking.
+  // Instead we batch rapid taps into one write, and always flush immediately
+  // at meaningful checkpoints (ending an interval, resetting, closing the tab).
+  let saveTimer = null;
+  let pendingSave = false;
+  const SAVE_DEBOUNCE_MS = 700;
+
+  function scheduleSave() {
+    pendingSave = true;
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(flushSave, SAVE_DEBOUNCE_MS);
+  }
+
+  async function flushSave() {
+    clearTimeout(saveTimer);
+    if (!pendingSave) return;
+    pendingSave = false;
     try {
       const result = await window.storage.set(STORAGE_KEY, JSON.stringify(state), false);
       if (result) {
         flashSaveIndicator("Saved");
       } else {
-        flashSaveIndicator("Save failed — check connection");
+        flashSaveIndicator("Save failed — retrying...");
+        pendingSave = true;
+        saveTimer = setTimeout(flushSave, SAVE_DEBOUNCE_MS * 2);
       }
     } catch (e) {
       console.warn("Could not save shift state:", e);
-      flashSaveIndicator("Save failed — check connection");
+      flashSaveIndicator("Save failed — retrying...");
+      pendingSave = true;
+      saveTimer = setTimeout(flushSave, SAVE_DEBOUNCE_MS * 2);
     }
   }
+
+  // Keep the old name working anywhere it's still referenced, but route it
+  // through an immediate flush instead of a raw write.
+  async function saveState() {
+    pendingSave = true;
+    await flushSave();
+  }
+
+  // Best-effort save if the tab is closed or backgrounded while a save is pending.
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden" && pendingSave) {
+      flushSave();
+    }
+  });
+  window.addEventListener("beforeunload", () => {
+    if (pendingSave) {
+      flushSave();
+    }
+  });
 
   async function loadState() {
     try {
@@ -435,6 +476,9 @@
     renderCompletedTable();
 
     // Most recently completed interval, if any — used for the "notStarted" hint text.
+    const prev = state.intervals.length > 0
+      ? state.intervals[state.intervals.length - 1]
+      : null;
 
     if (state.phase === "notStarted") {
       countEl.textContent = "0";
@@ -484,7 +528,7 @@
     state.liveCount += 1;
     render();
     bump("up");
-    await saveState();
+    scheduleSave();
   }
 
   async function decrement() {
@@ -493,7 +537,7 @@
     state.liveCount -= 1;
     render();
     bump("down");
-    await saveState();
+    scheduleSave();
   }
 
   async function handleActionClick() {
