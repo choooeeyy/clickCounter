@@ -533,6 +533,12 @@
   async function handleActionClick() {
     if (state.phase !== "running") return; // nothing to end yet
 
+    const isLastInterval = state.currentInterval >= 3;
+    const confirmMsg = isLastInterval
+      ? `End of Shift — are you sure you want to end Interval ${state.currentInterval} with a count of ${state.liveCount}?`
+      : `Are you sure you want to end Interval ${state.currentInterval} with a count of ${state.liveCount}?`;
+    if (!confirm(confirmMsg)) return;
+
     // End the current interval
     state.intervals.push({
       number: state.currentInterval,
