@@ -479,7 +479,7 @@
       actionBtn.innerHTML = state.currentInterval >= 3
         ? `End<span class="detail-text"> of Shift</span>`
         : `End<span class="detail-text"> Interval ${state.currentInterval}</span>`;
-      actionBtn.disabled = true;
+      actionBtn.disabled = false;
       plusBtn.disabled = false;
       minusBtn.disabled = true;
     } else if (state.phase === "running") {
@@ -531,7 +531,8 @@
   }
 
   async function handleActionClick() {
-    if (state.phase !== "running") return; // nothing to end yet
+    // Allowed from "running" (normal end) or "notStarted" (ending at 0, e.g. undertime)
+    if (state.phase !== "running" && state.phase !== "notStarted") return;
 
     const isLastInterval = state.currentInterval >= 3;
     const confirmMsg = isLastInterval
@@ -539,11 +540,15 @@
       : `Are you sure you want to end Interval ${state.currentInterval} with a count of ${state.liveCount}?`;
     if (!confirm(confirmMsg)) return;
 
+    const endTime = new Date().toISOString();
+    // If the interval was never started (ending at 0 / undertime), stamp start = end.
+    const startTime = state.startTime || endTime;
+
     // End the current interval
     state.intervals.push({
       number: state.currentInterval,
-      startTime: state.startTime,
-      endTime: new Date().toISOString(),
+      startTime: startTime,
+      endTime: endTime,
       count: state.liveCount
     });
 
@@ -579,8 +584,8 @@
     const text = [
       "EOD OOS CWH POD 0",
       fmtDate(shiftStart),
-      `Time Started : 11:30 AM`,
-      `Time Finished : 5:30 PM`,
+      `Time Started : 11:00 AM`,
+      `Time Finished : ${fmtTime(shiftEnd)}`,
       `Tasks Done/Finished: ${total}`
     ].join("\n");
 
