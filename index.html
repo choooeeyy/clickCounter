@@ -509,6 +509,47 @@
     setTimeout(() => countEl.classList.remove("bump-up", "bump-down"), 120);
   }
 
+
+  // --- Button click sound ---
+  let audioCtx = null;
+
+  function playClickSound(direction) {
+    try {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+
+      if (audioCtx.state === "suspended") {
+        audioCtx.resume();
+      }
+
+      const now = audioCtx.currentTime;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+
+      // Slightly different pitch for + and - clicks.
+      osc.type = "square";
+      osc.frequency.setValueAtTime(direction === "up" ? 650 : 500, now);
+      osc.frequency.exponentialRampToValueAtTime(
+        direction === "up" ? 420 : 330,
+        now + 0.035
+      );
+
+      gain.gain.setValueAtTime(0.0001, now);
+      gain.gain.exponentialRampToValueAtTime(0.12, now + 0.003);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.045);
+
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.05);
+    } catch (e) {
+      // Sound is optional; the counter should still work if audio is unavailable.
+      console.warn("Click sound unavailable:", e);
+    }
+  }
+
   async function increment() {
     if (state.phase === "notStarted") {
       // First tap of + starts this interval (and the shift, if this is Interval 1)
@@ -516,6 +557,7 @@
       state.startTime = new Date().toISOString();
     }
     state.liveCount += 1;
+    playClickSound("up");
     render();
     bump("up");
     scheduleSave();
@@ -525,6 +567,7 @@
     if (state.phase !== "running") return;
     if (state.liveCount <= 0) return;
     state.liveCount -= 1;
+    playClickSound("down");
     render();
     bump("down");
     scheduleSave();
