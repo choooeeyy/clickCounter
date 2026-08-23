@@ -37,9 +37,40 @@
   .subtitle {
     color: #475569;
     font-size: 12px;
-    margin-bottom: 28px;
+    margin-bottom: 16px;
     text-align: center;
   }
+
+  .pod-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    margin-bottom: 24px;
+  }
+  .pod-row label {
+    color: #64748b;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+  }
+  #podSelect {
+    background: #1f2937;
+    color: #e2e8f0;
+    border: 1px solid #334155;
+    border-radius: 8px;
+    padding: 6px 10px;
+    font-size: 14px;
+    font-weight: 700;
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    text-align: center;
+    text-align-last: center;
+  }
+  #podSelect:hover { border-color: #4ade80; }
+  #podSelect:focus { outline: none; border-color: #4ade80; }
 
   .dots { display: flex; justify-content: center; gap: 10px; margin-bottom: 24px; }
   .dot {
@@ -162,7 +193,8 @@
   @media (max-width: 340px) {
     .card { padding: 28px 20px; }
     h1 { font-size: 13px; letter-spacing: 1.5px; }
-    .subtitle { font-size: 11px; margin-bottom: 20px; }
+    .subtitle { font-size: 11px; margin-bottom: 14px; }
+    .pod-row { margin-bottom: 18px; }
     .dots { gap: 6px; margin-bottom: 18px; }
     .dot { width: 28px; height: 28px; font-size: 11px; }
     .counter-row { flex-wrap: wrap; gap: 12px; }
@@ -244,6 +276,14 @@
     <h1>Click Counter</h1>
     <div class="subtitle" id="saveIndicator">Progress saved automatically</div>
 
+    <div class="pod-row">
+      <label for="podSelect">Pod</label>
+      <select id="podSelect">
+        <option value="0">0</option>
+        <option value="1">1</option>
+      </select>
+    </div>
+
     <div class="dots" id="dots">
       <div class="dot" data-n="1">1</div>
       <div class="dot" data-n="2">2</div>
@@ -324,13 +364,15 @@
   const eodTextEl = document.getElementById("eodText");
   const eodCopyBtn = document.getElementById("eodCopyBtn");
   const saveIndicator = document.getElementById("saveIndicator");
+  const podSelect = document.getElementById("podSelect");
 
   let state = {
     phase: "notStarted", // notStarted -> running -> (repeat per interval) -> done
     currentInterval: 1,
     liveCount: 0,
     startTime: null,
-    intervals: []
+    intervals: [],
+    pod: "0"
   };
 
   let stateLoaded = false; // guard so we don't overwrite saved data before it's loaded
@@ -388,6 +430,9 @@
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
         state = JSON.parse(raw);
+        if (state.pod === undefined || state.pod === null) {
+          state.pod = "0";
+        }
       }
     } catch (e) {
       // No saved state yet, or it was corrupted — use defaults
@@ -494,7 +539,12 @@
     updateDots();
   }
 
+  function renderPodSelect() {
+    podSelect.value = String(state.pod ?? "0");
+  }
+
   function render() {
+    renderPodSelect();
     if (state.phase === "done") {
       renderSummary();
     } else {
@@ -609,7 +659,8 @@
 
   async function resetShift() {
     if (!confirm("Reset the current shift? This clears all recorded intervals.")) return;
-    state = { phase: "notStarted", currentInterval: 1, liveCount: 0, startTime: null, intervals: [] };
+    const keepPod = state.pod ?? "0";
+    state = { phase: "notStarted", currentInterval: 1, liveCount: 0, startTime: null, intervals: [], pod: keepPod };
     await saveState();
     render();
   }
@@ -625,7 +676,7 @@
     const total = state.intervals.reduce((sum, iv) => sum + iv.count, 0);
 
     const text = [
-      "EOD OOS CWH POD 0",
+      `EOD OOS CWH POD ${state.pod ?? "0"}`,
       fmtDate(shiftStart),
       `Time Started : 11:00 AM`,
       `Time Finished : ${fmtTime(shiftEnd)}`,
@@ -677,6 +728,10 @@
   actionBtn.addEventListener("click", handleActionClick);
   document.getElementById("resetBtn").addEventListener("click", resetShift);
   document.getElementById("newShiftBtn").addEventListener("click", resetShift);
+  podSelect.addEventListener("change", () => {
+    state.pod = podSelect.value;
+    scheduleSave();
+  });
 
   (function init() {
     loadState();
