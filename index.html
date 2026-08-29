@@ -366,6 +366,12 @@
   const saveIndicator = document.getElementById("saveIndicator");
   const podSelect = document.getElementById("podSelect");
 
+  // Time Started shown in the EOD summary, keyed by pod.
+  const POD_START_TIMES = {
+    "0": "10:00 AM",
+    "1": "11:00 AM"
+  };
+
   let state = {
     phase: "notStarted", // notStarted -> running -> (repeat per interval) -> done
     currentInterval: 1,
@@ -671,14 +677,15 @@
   }
 
   function openEodSummary() {
-    const shiftStart = state.intervals[0]?.startTime;
     const shiftEnd = state.intervals[state.intervals.length - 1]?.endTime;
     const total = state.intervals.reduce((sum, iv) => sum + iv.count, 0);
+    const pod = String(state.pod ?? "0");
+    const timeStarted = POD_START_TIMES[pod] || POD_START_TIMES["0"];
 
     const text = [
-      `EOD OOS CWH POD ${state.pod ?? "0"}`,
-      fmtDate(shiftStart),
-      `Time Started : 11:00 AM`,
+      `EOD OOS CWH POD ${pod}`,
+      fmtDate(state.intervals[0]?.startTime),
+      `Time Started : ${timeStarted}`,
       `Time Finished : ${fmtTime(shiftEnd)}`,
       `Tasks Done/Finished: ${total}`
     ].join("\n");
