@@ -238,13 +238,6 @@
     box-shadow: 0 20px 60px rgba(0,0,0,0.5);
     text-align: center;
   }
-  .eod-heading {
-    color: #4ade80;
-    font-size: 20px;
-    font-weight: 800;
-    letter-spacing: 1px;
-    margin-bottom: 22px;
-  }
   .eod-text {
     text-align: left;
     color: #e2e8f0;
@@ -329,6 +322,7 @@
       </table>
       <div class="btn-row" style="margin-top:20px; flex-direction:column; gap:10px;">
         <button class="secondary" id="eodSummaryBtn">EOD Summary</button>
+        <button class="secondary" id="editIntervalBtn">Edit EOD</button>
         <button class="secondary danger" id="newShiftBtn">Start New Shift</button>
       </div>
     </div>
@@ -365,15 +359,16 @@
   const eodCopyBtn = document.getElementById("eodCopyBtn");
   const saveIndicator = document.getElementById("saveIndicator");
   const podSelect = document.getElementById("podSelect");
+  const editIntervalBtn = document.getElementById("editIntervalBtn");
 
   // Time Started shown in the EOD summary, keyed by pod.
   const POD_START_TIMES = {
     "0": "10:00 AM",
-    "1": "11:00 AM"
+    "1": "10:00 AM"
   };
 
   let state = {
-    phase: "notStarted", // notStarted -> running -> (repeat per interval) -> done
+    phase: "notStarted", // notStarted -> running -> ... -> done
     currentInterval: 1,
     liveCount: 0,
     startTime: null,
@@ -507,6 +502,14 @@
     const shiftEnd = state.intervals[state.intervals.length - 1]?.endTime;
     shiftRangeEl.innerHTML = `Shift Start: <b>${fmtTime(shiftStart)}</b> &nbsp;·&nbsp; Shift End: <b>${fmtTime(shiftEnd)}</b>`;
 
+    // Let the user reopen the EOD interval for a fix, even after finishing the shift.
+    const canEdit = state.intervals.length > 0;
+    editIntervalBtn.style.display = canEdit ? "block" : "none";
+    const lastLabel = canEdit
+      ? (state.intervals[state.intervals.length - 1].number >= 3 ? "EOD" : `Interval ${state.intervals[state.intervals.length - 1].number}`)
+      : "";
+    editIntervalBtn.textContent = canEdit ? `Edit ${lastLabel}` : "Edit";
+
     liveView.style.display = "none";
     summaryView.style.display = "block";
   }
@@ -565,7 +568,6 @@
     setTimeout(() => countEl.classList.remove("bump-up", "bump-down"), 120);
   }
 
-
   // --- Button click sound ---
   let audioCtx = null;
 
@@ -607,6 +609,7 @@
   }
 
   async function increment() {
+    if (state.phase !== "notStarted" && state.phase !== "running") return;
     if (state.phase === "notStarted") {
       // First tap of + starts this interval (and the shift, if this is Interval 1)
       state.phase = "running";
@@ -651,8 +654,9 @@
       count: state.liveCount
     });
 
-    if (state.currentInterval >= 3) {
-      state.phase = "done"; // End of Shift
+    if (isLastInterval) {
+      // Shift is done.
+      state.phase = "done";
     } else {
       state.currentInterval += 1;
       state.phase = "notStarted";
@@ -663,10 +667,40 @@
     render();
   }
 
+  // Reopen the most recently completed interval (normally Interval 3 / EOD)
+  // so its count can be corrected or added to, even after the shift has
+  // already been marked finished.
+  async function reopenLastInterval() {
+    if (state.intervals.length === 0) return;
+    const last = state.intervals[state.intervals.length - 1];
+
+    const label = last.number >= 3 ? "EOD" : `Interval ${last.number}`;
+    let msg = `Reopen ${label} for editing? Current count: ${last.count}.`;
+    if (state.phase === "done") {
+      msg += " This will undo the shift completion until you end it again.";
+    }
+    if (!confirm(msg)) return;
+
+    state.intervals.pop();
+    state.currentInterval = last.number;
+    state.liveCount = last.count;
+    state.startTime = last.startTime;
+    state.phase = "running";
+    await saveState();
+    render();
+  }
+
   async function resetShift() {
     if (!confirm("Reset the current shift? This clears all recorded intervals.")) return;
     const keepPod = state.pod ?? "0";
-    state = { phase: "notStarted", currentInterval: 1, liveCount: 0, startTime: null, intervals: [], pod: keepPod };
+    state = {
+      phase: "notStarted",
+      currentInterval: 1,
+      liveCount: 0,
+      startTime: null,
+      intervals: [],
+      pod: keepPod
+    };
     await saveState();
     render();
   }
@@ -682,15 +716,15 @@
     const pod = String(state.pod ?? "0");
     const timeStarted = POD_START_TIMES[pod] || POD_START_TIMES["0"];
 
-    const text = [
+    const lines = [
       `EOD OOS CWH POD ${pod}`,
       fmtDate(state.intervals[0]?.startTime),
       `Time Started : ${timeStarted}`,
       `Time Finished : ${fmtTime(shiftEnd)}`,
       `Tasks Done/Finished: ${total}`
-    ].join("\n");
+    ];
 
-    eodTextEl.textContent = text;
+    eodTextEl.textContent = lines.join("\n");
     eodCopyBtn.textContent = "Copy";
     eodOverlay.style.display = "flex";
   }
@@ -735,6 +769,7 @@
   actionBtn.addEventListener("click", handleActionClick);
   document.getElementById("resetBtn").addEventListener("click", resetShift);
   document.getElementById("newShiftBtn").addEventListener("click", resetShift);
+  editIntervalBtn.addEventListener("click", reopenLastInterval);
   podSelect.addEventListener("change", () => {
     state.pod = podSelect.value;
     scheduleSave();
