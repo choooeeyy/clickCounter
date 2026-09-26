@@ -84,8 +84,9 @@
 
   .type-row {
     display: flex;
+    flex-wrap: wrap;
     justify-content: center;
-    gap: 0;
+    gap: 4px;
     background: #1f2937;
     border: 1px solid #334155;
     border-radius: 12px;
@@ -94,7 +95,7 @@
   }
   .type-btn {
     position: relative;
-    flex: 1;
+    flex: 1 1 0;
     background: transparent;
     border: none;
     color: #94a3b8;
@@ -249,9 +250,14 @@
     border: 1px solid #334155;
     border-radius: 10px;
     padding: 10px 14px;
-    margin-top: 14px;
   }
   .type-total-row b { color: #e2e8f0; }
+  #otherTypeRow, #otherTypeRowDone {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 14px;
+  }
 
   @media (max-width: 340px) {
     .card { padding: 28px 20px; }
@@ -260,6 +266,7 @@
     .pod-row { margin-bottom: 14px; }
     .type-row { margin-bottom: 18px; }
     .type-btn { font-size: 12px; padding: 8px 6px; }
+    .type-btn[data-type="box"] { flex: 1 1 100%; margin-top: 4px; }
     .type-label-full { display: none; }
     .type-label-short { display: inline; }
     .dots { gap: 6px; margin-bottom: 18px; }
@@ -344,6 +351,7 @@
     <div class="type-row" id="typeRow">
       <button class="type-btn" data-type="confirmation" type="button"><span class="type-label-full">Confirmation</span><span class="type-label-short">Confirm</span><span class="badge" style="display:none;"></span></button>
       <button class="type-btn" data-type="coverage" type="button"><span class="type-label-full">Coverage</span><span class="type-label-short">Cover</span><span class="badge" style="display:none;"></span></button>
+      <button class="type-btn" data-type="box" type="button"><span class="type-label-full">Box</span><span class="type-label-short">Box</span><span class="badge" style="display:none;"></span></button>
     </div>
 
     <div class="dots" id="dots">
@@ -374,7 +382,7 @@
         </tfoot>
       </table>
 
-      <div class="type-total-row" id="otherTypeRow" style="display:none;"></div>
+      <div id="otherTypeRow"></div>
     </div>
 
     <div id="summaryView" style="display:none;">
@@ -388,7 +396,7 @@
           <tr><td colspan="3" id="totalLabel">Total Finished</td><td id="grandTotal">0</td></tr>
         </tfoot>
       </table>
-      <div class="type-total-row" id="otherTypeRowDone" style="display:none; margin-top:16px;"></div>
+      <div id="otherTypeRowDone"></div>
       <div class="btn-row" style="margin-top:20px; flex-direction:column; gap:10px;">
         <button class="secondary" id="eodSummaryBtn">EOD Summary</button>
         <button class="secondary" id="editIntervalBtn">Edit EOD</button>
@@ -407,8 +415,8 @@
 
 <script>
   const STORAGE_KEY = "shift-state-manual";
-  const TYPES = ["confirmation", "coverage"];
-  const TYPE_LABEL = { confirmation: "Confirmation", coverage: "Coverage" };
+  const TYPES = ["confirmation", "coverage", "box"];
+  const TYPE_LABEL = { confirmation: "Confirmation", coverage: "Coverage", box: "Box" };
 
   const countEl = document.getElementById("count");
   const metaEl = document.getElementById("meta");
@@ -442,14 +450,16 @@
     return { liveCount: 0, startTime: null, intervals: [] };
   }
 
-  // NOTE: phase and currentInterval are now SHARED across both types —
+  // phase and currentInterval are SHARED across Confirmation/Coverage/Box —
   // ending an interval ends it for Confirmation and Coverage at the same time.
+  // Box has no per-interval concept: it keeps accumulating across intervals
+  // 1, 2 and 3, and only gets locked into a record when End of Shift is hit.
   let state = {
     pod: "0",
     activeType: "confirmation",
     phase: "notStarted",       // notStarted -> running -> ... -> done
     currentInterval: 1,
-    types: { confirmation: freshTypeData(), coverage: freshTypeData() }
+    types: { confirmation: freshTypeData(), coverage: freshTypeData(), box: freshTypeData() }
   };
 
   function track(type) { return state.types[type || state.activeType]; }
@@ -507,7 +517,7 @@
       if (!parsed) return;
 
       if (parsed.types && parsed.types.confirmation && typeof parsed.types.confirmation.phase !== "undefined") {
-        // Migrate from the earlier version where phase/currentInterval lived per-type.
+        // Migrate from the version where phase/currentInterval lived per-type.
         const conf = parsed.types.confirmation;
         state = {
           pod: parsed.pod ?? "0",
@@ -520,16 +530,18 @@
               liveCount: parsed.types.coverage?.liveCount ?? 0,
               startTime: parsed.types.coverage?.startTime ?? null,
               intervals: parsed.types.coverage?.intervals ?? []
-            }
+            },
+            box: freshTypeData()
           }
         };
       } else if (parsed.types && parsed.types.confirmation) {
-        // Already the current shared-phase format.
+        // Already the shared-phase format.
         state = parsed;
         if (!TYPES.includes(state.activeType)) state.activeType = "confirmation";
         if (!state.types.coverage) state.types.coverage = freshTypeData();
+        if (!state.types.box) state.types.box = freshTypeData();
       } else if (parsed.phase) {
-        // Oldest single-track format (pre-Confirmation/Coverage split).
+        // Oldest single-track format.
         state = {
           pod: parsed.pod ?? "0",
           activeType: "confirmation",
@@ -537,7 +549,8 @@
           currentInterval: parsed.currentInterval ?? 1,
           types: {
             confirmation: { liveCount: parsed.liveCount ?? 0, startTime: parsed.startTime ?? null, intervals: parsed.intervals ?? [] },
-            coverage: freshTypeData()
+            coverage: freshTypeData(),
+            box: freshTypeData()
           }
         };
       }
@@ -569,25 +582,32 @@
 
   function renderCompletedTable() {
     const t = track();
-    const showTable = t.intervals.length > 0 || state.phase === "running";
-    if (!showTable) {
+    if (state.activeType === "box") {
       completedTable.style.display = "none";
     } else {
-      completedBody.innerHTML = "";
-      t.intervals.forEach(iv => {
-        const row = document.createElement("tr");
-        row.innerHTML = `<td>Interval ${iv.number}</td><td>${fmtTime(iv.startTime)}</td><td>${fmtTime(iv.endTime)}</td><td>${iv.count}</td>`;
-        completedBody.appendChild(row);
-      });
-      partialTotalEl.textContent = trackTotal(t);
-      completedTable.style.display = "table";
+      const showTable = t.intervals.length > 0 || state.phase === "running";
+      if (!showTable) {
+        completedTable.style.display = "none";
+      } else {
+        completedBody.innerHTML = "";
+        t.intervals.forEach(iv => {
+          const row = document.createElement("tr");
+          row.innerHTML = `<td>Interval ${iv.number}</td><td>${fmtTime(iv.startTime)}</td><td>${fmtTime(iv.endTime)}</td><td>${iv.count}</td>`;
+          completedBody.appendChild(row);
+        });
+        partialTotalEl.textContent = trackTotal(t);
+        completedTable.style.display = "table";
+      }
     }
 
-    const otherType = state.activeType === "confirmation" ? "coverage" : "confirmation";
-    const otherTrack = track(otherType);
+    const others = TYPES.filter(ty => ty !== state.activeType);
     if (state.phase === "running") {
       otherTypeRow.style.display = "flex";
-      otherTypeRow.innerHTML = `<span>${TYPE_LABEL[otherType]} (this interval)</span><b>${otherTrack.liveCount}</b>`;
+      otherTypeRow.innerHTML = others.map(ty => {
+        const ot = track(ty);
+        const suffix = ty === "box" ? " · whole shift" : " (this interval)";
+        return `<div class="type-total-row"><span>${TYPE_LABEL[ty]}${suffix}</span><b>${ot.liveCount}</b></div>`;
+      }).join("");
     } else {
       otherTypeRow.style.display = "none";
     }
@@ -617,12 +637,16 @@
       : "";
     editIntervalBtn.textContent = canEdit ? `Edit ${lastLabel}` : "Edit";
 
-    const otherType = state.activeType === "confirmation" ? "coverage" : "confirmation";
-    const otherTrack = track(otherType);
-    const otherTotal = otherTrack.intervals.reduce((s, iv) => s + iv.count, 0);
-    if (otherTrack.intervals.length > 0) {
+    const others = TYPES.filter(ty => ty !== state.activeType);
+    const rows = others.map(ty => {
+      const ot = track(ty);
+      const otTotal = ot.intervals.reduce((s, iv) => s + iv.count, 0);
+      if (ot.intervals.length === 0) return "";
+      return `<div class="type-total-row"><span>${TYPE_LABEL[ty]}</span><b>${otTotal}</b></div>`;
+    }).join("");
+    if (rows) {
       otherTypeRowDone.style.display = "flex";
-      otherTypeRowDone.innerHTML = `<span>${TYPE_LABEL[otherType]}</span><b>${otherTotal}</b>`;
+      otherTypeRowDone.innerHTML = rows;
     } else {
       otherTypeRowDone.style.display = "none";
     }
@@ -637,24 +661,22 @@
     summaryView.style.display = "none";
     renderCompletedTable();
 
-    const prev = t.intervals.length > 0 ? t.intervals[t.intervals.length - 1] : null;
-
-    if (state.phase === "notStarted") {
+    if (state.activeType === "box") {
       countEl.textContent = String(t.liveCount);
-      metaEl.innerHTML = prev
+      metaEl.innerHTML = `<span class="detail-text">Box counts across the whole shift — locks in at End of Shift</span>`;
+    } else {
+      const prev = t.intervals.length > 0 ? t.intervals[t.intervals.length - 1] : null;
+      countEl.textContent = String(t.liveCount);
+      metaEl.innerHTML = (state.phase === "notStarted" && prev)
         ? `Interval ${prev.number} ended at <b>${fmtTime(prev.endTime)}</b> <span class="detail-text">· Tap + to start Interval ${state.currentInterval}</span>`
         : `<span class="detail-text"> </span>`;
-      actionBtn.innerHTML = state.currentInterval >= 3 ? `End<span class="detail-text"> of Shift</span>` : `End<span class="detail-text"> Interval ${state.currentInterval}</span>`;
-      actionBtn.disabled = false;
-      plusBtn.disabled = false;
-      minusBtn.disabled = true;
-    } else if (state.phase === "running") {
-      countEl.textContent = t.liveCount;
-      actionBtn.innerHTML = state.currentInterval >= 3 ? `End<span class="detail-text"> of Shift</span>` : `End<span class="detail-text"> Interval ${state.currentInterval}</span>`;
-      actionBtn.disabled = false;
-      plusBtn.disabled = false;
-      minusBtn.disabled = t.liveCount <= 0;
     }
+
+    actionBtn.innerHTML = state.currentInterval >= 3 ? `End<span class="detail-text"> of Shift</span>` : `End<span class="detail-text"> Interval ${state.currentInterval}</span>`;
+    actionBtn.disabled = false;
+    plusBtn.disabled = false;
+    minusBtn.disabled = (state.phase === "notStarted") ? true : (t.liveCount <= 0);
+
     updateDots();
   }
 
@@ -737,14 +759,17 @@
     const isLastInterval = state.currentInterval >= 3;
     const conf = track("confirmation");
     const cov = track("coverage");
-    const confirmMsg = (isLastInterval
-      ? `End of Shift — `
-      : `End Interval ${state.currentInterval} — `)
-      + `Confirmation: ${conf.liveCount}, Coverage: ${cov.liveCount}. This ends the interval for BOTH tracks. Continue?`;
+    const box = track("box");
+    let confirmMsg = (isLastInterval ? `End of Shift — ` : `End Interval ${state.currentInterval} — `)
+      + `Confirmation: ${conf.liveCount}, Coverage: ${cov.liveCount}`
+      + (isLastInterval ? `, Box: ${box.liveCount}` : "")
+      + `. This ends the interval for Confirmation and Coverage` + (isLastInterval ? ` and locks in the Box count.` : `.`);
     if (!confirm(confirmMsg)) return;
 
     const endTime = new Date().toISOString();
     TYPES.forEach(type => {
+      // Box only records/resets once, at End of Shift — otherwise it keeps accumulating.
+      if (type === "box" && !isLastInterval) return;
       const t = track(type);
       const startTime = t.startTime || endTime;
       t.intervals.push({ number: state.currentInterval, startTime, endTime, count: t.liveCount });
@@ -766,11 +791,15 @@
     const conf = track("confirmation");
     if (conf.intervals.length === 0) return;
     const cov = track("coverage");
+    const box = track("box");
     const lastConf = conf.intervals[conf.intervals.length - 1];
     const lastCov = cov.intervals[cov.intervals.length - 1];
+    const wasFinal = lastConf.number >= 3;
+    const lastBox = wasFinal ? box.intervals[box.intervals.length - 1] : null;
 
-    const label = lastConf.number >= 3 ? "EOD" : `Interval ${lastConf.number}`;
-    let msg = `Reopen ${label} for editing on BOTH tracks? Confirmation: ${lastConf.count}, Coverage: ${lastCov ? lastCov.count : 0}.`;
+    const label = wasFinal ? "EOD" : `Interval ${lastConf.number}`;
+    let msg = `Reopen ${label} for editing? Confirmation: ${lastConf.count}, Coverage: ${lastCov ? lastCov.count : 0}`
+      + (wasFinal ? `, Box: ${lastBox ? lastBox.count : 0}` : "") + ".";
     if (state.phase === "done") msg += " This will undo the shift completion until you end it again.";
     if (!confirm(msg)) return;
 
@@ -785,13 +814,20 @@
       cov.startTime = lastCov.startTime;
     }
 
+    if (wasFinal && lastBox) {
+      box.intervals.pop();
+      box.liveCount = lastBox.count;
+      box.startTime = lastBox.startTime;
+    }
+    // If this wasn't the final interval, Box wasn't touched when it ended, so leave it be.
+
     state.phase = "running";
     await saveState();
     render();
   }
 
   async function resetShift() {
-    if (!confirm("Reset the current shift? This clears all recorded intervals for BOTH Confirmation and Coverage.")) return;
+    if (!confirm("Reset the current shift? This clears all recorded intervals for Confirmation, Coverage and Box.")) return;
     const keepPod = state.pod ?? "0";
     const keepType = state.activeType ?? "confirmation";
     state = {
@@ -799,7 +835,7 @@
       activeType: keepType,
       phase: "notStarted",
       currentInterval: 1,
-      types: { confirmation: freshTypeData(), coverage: freshTypeData() }
+      types: { confirmation: freshTypeData(), coverage: freshTypeData(), box: freshTypeData() }
     };
     await saveState();
     render();
@@ -818,11 +854,13 @@
 
     const confIntervals = state.types.confirmation.intervals;
     const covIntervals = state.types.coverage.intervals;
+    const boxIntervals = state.types.box.intervals;
     const confTotal = confIntervals.reduce((s, iv) => s + iv.count, 0);
     const covTotal = covIntervals.reduce((s, iv) => s + iv.count, 0);
-    const total = confTotal + covTotal;
+    const boxTotal = boxIntervals.reduce((s, iv) => s + iv.count, 0);
+    const total = confTotal + covTotal + boxTotal;
 
-    const allTimes = [...confIntervals, ...covIntervals];
+    const allTimes = [...confIntervals, ...covIntervals, ...boxIntervals];
     const starts = allTimes.map(iv => iv.startTime).filter(Boolean).sort();
     const ends = allTimes.map(iv => iv.endTime).filter(Boolean).sort();
 
@@ -833,7 +871,7 @@
       `Time Finished : ${fmtTime(ends[ends.length - 1])}`,
       `Total Confirmation Task: ${confTotal}`,
       `Total Coverage Task: ${covTotal}`,
-      `Total Drawn Box: `
+      `Total Drawn Box: ${boxTotal}`
     ];
 
     eodTextEl.textContent = lines.join("\n");
