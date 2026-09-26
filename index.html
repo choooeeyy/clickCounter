@@ -2,8 +2,18 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Click Counter</title>
 <style>
+  :root {
+    --bg: #0f172a;
+    --card-bg: #111827;
+    --card-border: #1f2937;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  html { scroll-padding-top: env(safe-area-inset-top, 0px); }
   * { box-sizing: border-box; }
   body {
     margin: 0;
@@ -11,13 +21,13 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: linear-gradient(135deg, #1e293b, #0f172a);
+    background: linear-gradient(135deg, #1e293b, var(--bg));
     font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
     padding: 24px;
   }
   .card {
-    background: #111827;
-    border: 1px solid #1f2937;
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
     border-radius: 20px;
     padding: 40px 48px;
     text-align: center;
@@ -46,7 +56,7 @@
     align-items: center;
     justify-content: center;
     gap: 8px;
-    margin-bottom: 24px;
+    margin-bottom: 16px;
   }
   .pod-row label {
     color: #64748b;
@@ -71,6 +81,46 @@
   }
   #podSelect:hover { border-color: #4ade80; }
   #podSelect:focus { outline: none; border-color: #4ade80; }
+
+  /* Type toggle (Confirmation / Coverage) */
+  .type-row {
+    display: flex;
+    justify-content: center;
+    gap: 0;
+    background: #1f2937;
+    border: 1px solid #334155;
+    border-radius: 12px;
+    padding: 4px;
+    margin-bottom: 22px;
+  }
+  .type-btn {
+    position: relative;
+    flex: 1;
+    background: transparent;
+    border: none;
+    color: #94a3b8;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    padding: 9px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 0.15s ease, color 0.15s ease;
+  }
+  .type-btn.active { background: #22c55e; color: #052e12; }
+  .type-btn:not(.active):hover { color: #e2e8f0; }
+  .type-btn .badge {
+    position: absolute;
+    top: 4px;
+    right: 6px;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: #4ade80;
+  }
+  .type-btn.active .badge { background: #052e12; }
+  .type-label-short { display: none; }
+  .type-label-full { display: inline; }
 
   .dots { display: flex; justify-content: center; gap: 10px; margin-bottom: 24px; }
   .dot {
@@ -190,11 +240,28 @@
     padding-top: 14px;
   }
 
+  .type-total-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 13px;
+    color: #94a3b8;
+    background: #1f2937;
+    border: 1px solid #334155;
+    border-radius: 10px;
+    padding: 10px 14px;
+    margin-top: 14px;
+  }
+  .type-total-row b { color: #e2e8f0; }
+
   @media (max-width: 340px) {
     .card { padding: 28px 20px; }
     h1 { font-size: 13px; letter-spacing: 1.5px; }
     .subtitle { font-size: 11px; margin-bottom: 14px; }
-    .pod-row { margin-bottom: 18px; }
+    .pod-row { margin-bottom: 14px; }
+    .type-row { margin-bottom: 18px; }
+    .type-btn { font-size: 12px; padding: 8px 6px; }
+    .type-label-full { display: none; }
+    .type-label-short { display: inline; }
     .dots { gap: 6px; margin-bottom: 18px; }
     .dot { width: 28px; height: 28px; font-size: 11px; }
     .counter-row { flex-wrap: wrap; gap: 12px; }
@@ -247,9 +314,7 @@
     white-space: pre-wrap;
     margin: 8px 0 20px;
   }
-  .eod-copy-btn {
-    width: 100%;
-  }
+  .eod-copy-btn { width: 100%; }
   .eod-close {
     position: absolute;
     top: 10px;
@@ -277,6 +342,11 @@
       </select>
     </div>
 
+    <div class="type-row" id="typeRow">
+      <button class="type-btn" data-type="confirmation" type="button"><span class="type-label-full">Confirmation</span><span class="type-label-short">Confirm</span><span class="badge" style="display:none;"></span></button>
+      <button class="type-btn" data-type="coverage" type="button"><span class="type-label-full">Coverage</span><span class="type-label-short">Cover</span><span class="badge" style="display:none;"></span></button>
+    </div>
+
     <div class="dots" id="dots">
       <div class="dot" data-n="1">1</div>
       <div class="dot" data-n="2">2</div>
@@ -293,10 +363,9 @@
       <div class="meta" id="meta"><span class="detail-text"></span></div>
       <button class="primary" id="actionBtn">End<span class="detail-text"> Interval 1</span></button>
       <div class="btn-row">
-        <button class="secondary danger" id="resetBtn">Reset Shift</button>
+        <button class="secondary danger" id="resetBtn">Reset Track</button>
       </div>
 
-      <!-- Completed intervals so far, stays visible while working on the current one -->
       <table id="completedTable" style="display:none; margin-top:26px;">
         <thead>
           <tr><th>Interval</th><th>Start</th><th>End</th><th>Count</th></tr>
@@ -306,6 +375,8 @@
           <tr><td colspan="3">Partial Total</td><td id="partialTotal">0</td></tr>
         </tfoot>
       </table>
+
+      <div class="type-total-row" id="otherTypeRow" style="display:none;"></div>
     </div>
 
     <!-- Final summary view -->
@@ -317,13 +388,14 @@
         </thead>
         <tbody id="summaryBody"></tbody>
         <tfoot>
-          <tr><td colspan="3">Total Task Finished</td><td id="grandTotal">0</td></tr>
+          <tr><td colspan="3" id="totalLabel">Total Finished</td><td id="grandTotal">0</td></tr>
         </tfoot>
       </table>
+      <div class="type-total-row" id="otherTypeRowDone" style="display:none; margin-top:16px;"></div>
       <div class="btn-row" style="margin-top:20px; flex-direction:column; gap:10px;">
         <button class="secondary" id="eodSummaryBtn">EOD Summary</button>
         <button class="secondary" id="editIntervalBtn">Edit EOD</button>
-        <button class="secondary danger" id="newShiftBtn">Start New Shift</button>
+        <button class="secondary danger" id="newShiftBtn">Start New Track</button>
       </div>
     </div>
   </div>
@@ -339,6 +411,8 @@
 
 <script>
   const STORAGE_KEY = "shift-state-manual";
+  const TYPES = ["confirmation", "coverage"];
+  const TYPE_LABEL = { confirmation: "Confirmation", coverage: "Coverage" };
 
   const countEl = document.getElementById("count");
   const metaEl = document.getElementById("meta");
@@ -349,6 +423,7 @@
   const summaryView = document.getElementById("summaryView");
   const summaryBody = document.getElementById("summaryBody");
   const grandTotalEl = document.getElementById("grandTotal");
+  const totalLabelEl = document.getElementById("totalLabel");
   const dots = document.querySelectorAll(".dot");
   const completedTable = document.getElementById("completedTable");
   const completedBody = document.getElementById("completedBody");
@@ -360,43 +435,42 @@
   const saveIndicator = document.getElementById("saveIndicator");
   const podSelect = document.getElementById("podSelect");
   const editIntervalBtn = document.getElementById("editIntervalBtn");
+  const typeRow = document.getElementById("typeRow");
+  const typeButtons = typeRow.querySelectorAll(".type-btn");
+  const otherTypeRow = document.getElementById("otherTypeRow");
+  const otherTypeRowDone = document.getElementById("otherTypeRowDone");
 
-  // Time Started shown in the EOD summary, keyed by pod.
-  const POD_START_TIMES = {
-    "0": "10:00 AM",
-    "1": "10:00 AM"
-  };
+  const POD_START_TIMES = { "0": "10:00 AM", "1": "10:00 AM" };
+
+  function freshTrack() {
+    return { phase: "notStarted", currentInterval: 1, liveCount: 0, startTime: null, intervals: [] };
+  }
 
   let state = {
-    phase: "notStarted", // notStarted -> running -> ... -> done
-    currentInterval: 1,
-    liveCount: 0,
-    startTime: null,
-    intervals: [],
-    pod: "0"
+    pod: "0",
+    activeType: "confirmation",
+    types: { confirmation: freshTrack(), coverage: freshTrack() }
   };
 
-  let stateLoaded = false; // guard so we don't overwrite saved data before it's loaded
+  function track(type) { return state.types[type || state.activeType]; }
 
   function fmtTime(iso) {
     if (!iso) return "--";
     const d = new Date(iso);
     return d.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
   }
+  function fmtDate(iso) {
+    const d = iso ? new Date(iso) : new Date();
+    return d.toLocaleDateString();
+  }
 
   function flashSaveIndicator(text) {
     saveIndicator.textContent = text;
     saveIndicator.classList.add("show");
     clearTimeout(flashSaveIndicator._t);
-    flashSaveIndicator._t = setTimeout(() => {
-      saveIndicator.classList.remove("show");
-    }, 1200);
+    flashSaveIndicator._t = setTimeout(() => saveIndicator.classList.remove("show"), 1200);
   }
 
-  // --- Debounced saving ---
-  // localStorage writes are synchronous and local to the browser, so there's
-  // no real risk of "rate limiting" here — but we still batch rapid taps to
-  // avoid needless writes, and always flush at meaningful checkpoints.
   let saveTimer = null;
   let pendingSave = false;
   const SAVE_DEBOUNCE_MS = 400;
@@ -415,12 +489,11 @@
       localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
       flashSaveIndicator("Saved");
     } catch (e) {
-      console.warn("Could not save shift state:", e);
+      console.warn("Could not save state:", e);
       flashSaveIndicator("Save failed — storage may be full or blocked");
     }
   }
 
-  // Keep the old name working anywhere it's still referenced.
   async function saveState() {
     pendingSave = true;
     flushSave();
@@ -430,117 +503,141 @@
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) {
-        state = JSON.parse(raw);
-        if (state.pod === undefined || state.pod === null) {
-          state.pod = "0";
+        const parsed = JSON.parse(raw);
+        if (parsed && parsed.types && parsed.types.confirmation) {
+          // already in the new per-type format
+          state = parsed;
+          if (!state.activeType || !TYPES.includes(state.activeType)) state.activeType = "confirmation";
+          if (!state.types.coverage) state.types.coverage = freshTrack();
+        } else if (parsed && parsed.phase) {
+          // migrate old single-track format into "confirmation"
+          state = {
+            pod: parsed.pod ?? "0",
+            activeType: "confirmation",
+            types: {
+              confirmation: {
+                phase: parsed.phase,
+                currentInterval: parsed.currentInterval ?? 1,
+                liveCount: parsed.liveCount ?? 0,
+                startTime: parsed.startTime ?? null,
+                intervals: parsed.intervals ?? []
+              },
+              coverage: freshTrack()
+            }
+          };
         }
       }
     } catch (e) {
-      // No saved state yet, or it was corrupted — use defaults
-    } finally {
-      stateLoaded = true;
+      // no saved state yet, or it was corrupted — use defaults
     }
   }
 
-  // Best-effort save if the tab is closed or backgrounded while a save is pending.
   document.addEventListener("visibilitychange", () => {
-    if (document.visibilityState === "hidden" && pendingSave) {
-      flushSave();
-    }
+    if (document.visibilityState === "hidden" && pendingSave) flushSave();
   });
-  window.addEventListener("beforeunload", () => {
-    if (pendingSave) {
-      flushSave();
-    }
-  });
+  window.addEventListener("beforeunload", () => { if (pendingSave) flushSave(); });
 
   function updateDots() {
+    const t = track();
     dots.forEach(dot => {
       const n = parseInt(dot.dataset.n, 10);
       dot.classList.remove("active", "done");
-      if (state.intervals.find(iv => iv.number === n)) {
-        dot.classList.add("done");
-      } else if (n === state.currentInterval && state.phase === "running") {
-        dot.classList.add("active");
-      }
+      if (t.intervals.find(iv => iv.number === n)) dot.classList.add("done");
+      else if (n === t.currentInterval && t.phase === "running") dot.classList.add("active");
     });
+  }
+
+  function trackTotal(t) {
+    let total = t.intervals.reduce((s, iv) => s + iv.count, 0);
+    if (t.phase === "running") total += t.liveCount;
+    return total;
   }
 
   function renderCompletedTable() {
-    const showTable = state.intervals.length > 0 || state.phase === "running";
-    if (!showTable) {
-      completedTable.style.display = "none";
-      return;
+    const t = track();
+    const showTable = t.intervals.length > 0 || t.phase === "running";
+    if (!showTable) { completedTable.style.display = "none"; }
+    else {
+      completedBody.innerHTML = "";
+      t.intervals.forEach(iv => {
+        const row = document.createElement("tr");
+        row.innerHTML = `<td>Interval ${iv.number}</td><td>${fmtTime(iv.startTime)}</td><td>${fmtTime(iv.endTime)}</td><td>${iv.count}</td>`;
+        completedBody.appendChild(row);
+      });
+      partialTotalEl.textContent = trackTotal(t);
+      completedTable.style.display = "table";
     }
-    completedBody.innerHTML = "";
-    let partial = 0;
-    state.intervals.forEach(iv => {
-      partial += iv.count;
-      const row = document.createElement("tr");
-      row.innerHTML = `<td>Interval ${iv.number}</td><td>${fmtTime(iv.startTime)}</td><td>${fmtTime(iv.endTime)}</td><td>${iv.count}</td>`;
-      completedBody.appendChild(row);
-    });
-    if (state.phase === "running") {
-      partial += state.liveCount; // include the interval currently in progress
+
+    // Show a small reminder of the other type's progress, so it's clear it's still there
+    const otherType = state.activeType === "confirmation" ? "coverage" : "confirmation";
+    const otherTrack = track(otherType);
+    const otherTotal = trackTotal(otherTrack);
+    if (otherTotal > 0 || otherTrack.intervals.length > 0) {
+      otherTypeRow.style.display = "flex";
+      otherTypeRow.innerHTML = `<span>${TYPE_LABEL[otherType]} (paused)</span><b>${otherTotal}</b>`;
+    } else {
+      otherTypeRow.style.display = "none";
     }
-    partialTotalEl.textContent = partial;
-    completedTable.style.display = "table";
   }
 
   function renderSummary() {
+    const t = track();
     summaryBody.innerHTML = "";
     let total = 0;
-    state.intervals.forEach(iv => {
+    t.intervals.forEach(iv => {
       total += iv.count;
       const row = document.createElement("tr");
       row.innerHTML = `<td>Interval ${iv.number}</td><td>${fmtTime(iv.startTime)}</td><td>${fmtTime(iv.endTime)}</td><td>${iv.count}</td>`;
       summaryBody.appendChild(row);
     });
     grandTotalEl.textContent = total;
+    totalLabelEl.textContent = `${TYPE_LABEL[state.activeType]} Total Finished`;
 
-    const shiftStart = state.intervals[0]?.startTime;
-    const shiftEnd = state.intervals[state.intervals.length - 1]?.endTime;
-    shiftRangeEl.innerHTML = `Shift Start: <b>${fmtTime(shiftStart)}</b> &nbsp;·&nbsp; Shift End: <b>${fmtTime(shiftEnd)}</b>`;
+    const shiftStart = t.intervals[0]?.startTime;
+    const shiftEnd = t.intervals[t.intervals.length - 1]?.endTime;
+    shiftRangeEl.innerHTML = `Start: <b>${fmtTime(shiftStart)}</b> &nbsp;·&nbsp; End: <b>${fmtTime(shiftEnd)}</b>`;
 
-    // Let the user reopen the EOD interval for a fix, even after finishing the shift.
-    const canEdit = state.intervals.length > 0;
+    const canEdit = t.intervals.length > 0;
     editIntervalBtn.style.display = canEdit ? "block" : "none";
     const lastLabel = canEdit
-      ? (state.intervals[state.intervals.length - 1].number >= 3 ? "EOD" : `Interval ${state.intervals[state.intervals.length - 1].number}`)
+      ? (t.intervals[t.intervals.length - 1].number >= 3 ? "EOD" : `Interval ${t.intervals[t.intervals.length - 1].number}`)
       : "";
     editIntervalBtn.textContent = canEdit ? `Edit ${lastLabel}` : "Edit";
+
+    const otherType = state.activeType === "confirmation" ? "coverage" : "confirmation";
+    const otherTrack = track(otherType);
+    const otherTotal = trackTotal(otherTrack);
+    if (otherTotal > 0 || otherTrack.intervals.length > 0) {
+      otherTypeRowDone.style.display = "flex";
+      otherTypeRowDone.innerHTML = `<span>${TYPE_LABEL[otherType]}</span><b>${otherTotal}</b>`;
+    } else {
+      otherTypeRowDone.style.display = "none";
+    }
 
     liveView.style.display = "none";
     summaryView.style.display = "block";
   }
 
   function renderLive() {
+    const t = track();
     liveView.style.display = "block";
     summaryView.style.display = "none";
     renderCompletedTable();
 
-    // Most recently completed interval, if any — used for the "notStarted" hint text.
-    const prev = state.intervals.length > 0
-      ? state.intervals[state.intervals.length - 1]
-      : null;
+    const prev = t.intervals.length > 0 ? t.intervals[t.intervals.length - 1] : null;
 
-    if (state.phase === "notStarted") {
+    if (t.phase === "notStarted") {
       countEl.textContent = "0";
-      const startHint = `<span class="detail-text"> </span>`;
       metaEl.innerHTML = prev
-        ? `Interval ${prev.number} ended at <b>${fmtTime(prev.endTime)}</b> <span class="detail-text">· Tap + to start Interval ${state.currentInterval}</span>`
-        : startHint;
-      actionBtn.innerHTML = state.currentInterval >= 3
-        ? `End<span class="detail-text"> of Shift</span>`
-        : `End<span class="detail-text"> Interval ${state.currentInterval}</span>`;
+        ? `Interval ${prev.number} ended at <b>${fmtTime(prev.endTime)}</b> <span class="detail-text">· Tap + to start Interval ${t.currentInterval}</span>`
+        : `<span class="detail-text"> </span>`;
+      actionBtn.innerHTML = t.currentInterval >= 3 ? `End<span class="detail-text"> of Shift</span>` : `End<span class="detail-text"> Interval ${t.currentInterval}</span>`;
       actionBtn.disabled = false;
       plusBtn.disabled = false;
       minusBtn.disabled = true;
-    } else if (state.phase === "running") {
-      countEl.textContent = state.liveCount;
-      actionBtn.innerHTML = state.currentInterval >= 3
-        ? `End<span class="detail-text"> of Shift</span>`
-        : `End<span class="detail-text"> Interval ${state.currentInterval}</span>`;
+    } else if (t.phase === "running") {
+      countEl.textContent = t.liveCount;
+      actionBtn.innerHTML = t.currentInterval >= 3 ? `End<span class="detail-text"> of Shift</span>` : `End<span class="detail-text"> Interval ${t.currentInterval}</span>`;
       actionBtn.disabled = false;
       plusBtn.disabled = false;
       minusBtn.disabled = false;
@@ -548,17 +645,25 @@
     updateDots();
   }
 
-  function renderPodSelect() {
-    podSelect.value = String(state.pod ?? "0");
+  function renderPodSelect() { podSelect.value = String(state.pod ?? "0"); }
+
+  function renderTypeButtons() {
+    typeButtons.forEach(btn => {
+      const type = btn.dataset.type;
+      const isActive = type === state.activeType;
+      btn.classList.toggle("active", isActive);
+      const badge = btn.querySelector(".badge");
+      const hasProgress = trackTotal(track(type)) > 0 || track(type).intervals.length > 0;
+      badge.style.display = (!isActive && hasProgress) ? "block" : "none";
+    });
   }
 
   function render() {
     renderPodSelect();
-    if (state.phase === "done") {
-      renderSummary();
-    } else {
-      renderLive();
-    }
+    renderTypeButtons();
+    const t = track();
+    if (t.phase === "done") renderSummary();
+    else renderLive();
   }
 
   function bump(direction) {
@@ -568,54 +673,37 @@
     setTimeout(() => countEl.classList.remove("bump-up", "bump-down"), 120);
   }
 
-  // --- Button click sound ---
   let audioCtx = null;
-
   function playClickSound(direction) {
     try {
-      if (!audioCtx) {
-        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-      }
-
-      if (audioCtx.state === "suspended") {
-        audioCtx.resume();
-      }
-
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (audioCtx.state === "suspended") audioCtx.resume();
       const now = audioCtx.currentTime;
       const osc = audioCtx.createOscillator();
       const gain = audioCtx.createGain();
-
-      // Slightly different pitch for + and - clicks.
       osc.type = "square";
       osc.frequency.setValueAtTime(direction === "up" ? 650 : 500, now);
-      osc.frequency.exponentialRampToValueAtTime(
-        direction === "up" ? 420 : 330,
-        now + 0.035
-      );
-
+      osc.frequency.exponentialRampToValueAtTime(direction === "up" ? 420 : 330, now + 0.035);
       gain.gain.setValueAtTime(0.0001, now);
       gain.gain.exponentialRampToValueAtTime(0.12, now + 0.003);
       gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.045);
-
       osc.connect(gain);
       gain.connect(audioCtx.destination);
-
       osc.start(now);
       osc.stop(now + 0.05);
     } catch (e) {
-      // Sound is optional; the counter should still work if audio is unavailable.
       console.warn("Click sound unavailable:", e);
     }
   }
 
   async function increment() {
-    if (state.phase !== "notStarted" && state.phase !== "running") return;
-    if (state.phase === "notStarted") {
-      // First tap of + starts this interval (and the shift, if this is Interval 1)
-      state.phase = "running";
-      state.startTime = new Date().toISOString();
+    const t = track();
+    if (t.phase !== "notStarted" && t.phase !== "running") return;
+    if (t.phase === "notStarted") {
+      t.phase = "running";
+      t.startTime = new Date().toISOString();
     }
-    state.liveCount += 1;
+    t.liveCount += 1;
     playClickSound("up");
     render();
     bump("up");
@@ -623,9 +711,10 @@
   }
 
   async function decrement() {
-    if (state.phase !== "running") return;
-    if (state.liveCount <= 0) return;
-    state.liveCount -= 1;
+    const t = track();
+    if (t.phase !== "running") return;
+    if (t.liveCount <= 0) return;
+    t.liveCount -= 1;
     playClickSound("down");
     render();
     bump("down");
@@ -633,94 +722,87 @@
   }
 
   async function handleActionClick() {
-    // Allowed from "running" (normal end) or "notStarted" (ending at 0, e.g. undertime)
-    if (state.phase !== "running" && state.phase !== "notStarted") return;
+    const t = track();
+    if (t.phase !== "running" && t.phase !== "notStarted") return;
 
-    const isLastInterval = state.currentInterval >= 3;
+    const isLastInterval = t.currentInterval >= 3;
+    const label = TYPE_LABEL[state.activeType];
     const confirmMsg = isLastInterval
-      ? `End of Shift — are you sure you want to end Interval ${state.currentInterval} with a count of ${state.liveCount}?`
-      : `Are you sure you want to end Interval ${state.currentInterval} with a count of ${state.liveCount}?`;
+      ? `End of Shift (${label}) — are you sure you want to end Interval ${t.currentInterval} with a count of ${t.liveCount}?`
+      : `Are you sure you want to end ${label} Interval ${t.currentInterval} with a count of ${t.liveCount}?`;
     if (!confirm(confirmMsg)) return;
 
     const endTime = new Date().toISOString();
-    // If the interval was never started (ending at 0 / undertime), stamp start = end.
-    const startTime = state.startTime || endTime;
+    const startTime = t.startTime || endTime;
 
-    // End the current interval
-    state.intervals.push({
-      number: state.currentInterval,
-      startTime: startTime,
-      endTime: endTime,
-      count: state.liveCount
-    });
+    t.intervals.push({ number: t.currentInterval, startTime, endTime, count: t.liveCount });
 
     if (isLastInterval) {
-      // Shift is done.
-      state.phase = "done";
+      t.phase = "done";
     } else {
-      state.currentInterval += 1;
-      state.phase = "notStarted";
+      t.currentInterval += 1;
+      t.phase = "notStarted";
     }
-    state.liveCount = 0;
-    state.startTime = null;
+    t.liveCount = 0;
+    t.startTime = null;
     await saveState();
     render();
   }
 
-  // Reopen the most recently completed interval (normally Interval 3 / EOD)
-  // so its count can be corrected or added to, even after the shift has
-  // already been marked finished.
   async function reopenLastInterval() {
-    if (state.intervals.length === 0) return;
-    const last = state.intervals[state.intervals.length - 1];
-
+    const t = track();
+    if (t.intervals.length === 0) return;
+    const last = t.intervals[t.intervals.length - 1];
     const label = last.number >= 3 ? "EOD" : `Interval ${last.number}`;
-    let msg = `Reopen ${label} for editing? Current count: ${last.count}.`;
-    if (state.phase === "done") {
-      msg += " This will undo the shift completion until you end it again.";
-    }
+    let msg = `Reopen ${TYPE_LABEL[state.activeType]} ${label} for editing? Current count: ${last.count}.`;
+    if (t.phase === "done") msg += " This will undo that track's completion until you end it again.";
     if (!confirm(msg)) return;
 
-    state.intervals.pop();
-    state.currentInterval = last.number;
-    state.liveCount = last.count;
-    state.startTime = last.startTime;
-    state.phase = "running";
+    t.intervals.pop();
+    t.currentInterval = last.number;
+    t.liveCount = last.count;
+    t.startTime = last.startTime;
+    t.phase = "running";
     await saveState();
     render();
   }
 
   async function resetShift() {
-    if (!confirm("Reset the current shift? This clears all recorded intervals.")) return;
-    const keepPod = state.pod ?? "0";
-    state = {
-      phase: "notStarted",
-      currentInterval: 1,
-      liveCount: 0,
-      startTime: null,
-      intervals: [],
-      pod: keepPod
-    };
+    const label = TYPE_LABEL[state.activeType];
+    if (!confirm(`Reset the ${label} track? This clears all recorded intervals for ${label} only — your ${TYPE_LABEL[state.activeType === "confirmation" ? "coverage" : "confirmation"]} progress is untouched.`)) return;
+    state.types[state.activeType] = freshTrack();
     await saveState();
     render();
   }
 
-  function fmtDate(iso) {
-    const d = iso ? new Date(iso) : new Date();
-    return d.toLocaleDateString(); 
+  function setActiveType(type) {
+    if (!TYPES.includes(type) || type === state.activeType) return;
+    state.activeType = type;
+    scheduleSave();
+    render();
   }
 
   function openEodSummary() {
-    const shiftEnd = state.intervals[state.intervals.length - 1]?.endTime;
-    const total = state.intervals.reduce((sum, iv) => sum + iv.count, 0);
     const pod = String(state.pod ?? "0");
     const timeStarted = POD_START_TIMES[pod] || POD_START_TIMES["0"];
 
+    const confIntervals = state.types.confirmation.intervals;
+    const covIntervals = state.types.coverage.intervals;
+    const confTotal = confIntervals.reduce((s, iv) => s + iv.count, 0);
+    const covTotal = covIntervals.reduce((s, iv) => s + iv.count, 0);
+    const total = confTotal + covTotal;
+
+    const allTimes = [...confIntervals, ...covIntervals];
+    const starts = allTimes.map(iv => iv.startTime).filter(Boolean).sort();
+    const ends = allTimes.map(iv => iv.endTime).filter(Boolean).sort();
+
     const lines = [
       `EOD OOS CWH POD ${pod}`,
-      fmtDate(state.intervals[0]?.startTime),
+      fmtDate(starts[0]),
       `Time Started : ${timeStarted}`,
-      `Time Finished : ${fmtTime(shiftEnd)}`,
+      `Time Finished : ${fmtTime(ends[ends.length - 1])}`,
+      `Confirmation: ${confTotal}`,
+      `Coverage: ${covTotal}`,
       `Tasks Done/Finished: ${total}`
     ];
 
@@ -729,16 +811,13 @@
     eodOverlay.style.display = "flex";
   }
 
-  function closeEodSummary() {
-    eodOverlay.style.display = "none";
-  }
+  function closeEodSummary() { eodOverlay.style.display = "none"; }
 
   async function copyEodText() {
     const text = eodTextEl.textContent;
     try {
       await navigator.clipboard.writeText(text);
     } catch (e) {
-      // Fallback for environments where the Clipboard API is blocked
       const temp = document.createElement("textarea");
       temp.value = text;
       temp.style.position = "fixed";
@@ -746,11 +825,7 @@
       document.body.appendChild(temp);
       temp.focus();
       temp.select();
-      try {
-        document.execCommand("copy");
-      } catch (err) {
-        console.warn("Copy failed:", err);
-      }
+      try { document.execCommand("copy"); } catch (err) { console.warn("Copy failed:", err); }
       document.body.removeChild(temp);
     }
     eodCopyBtn.textContent = "Copied!";
@@ -760,9 +835,7 @@
   document.getElementById("eodSummaryBtn").addEventListener("click", openEodSummary);
   document.getElementById("eodCloseBtn").addEventListener("click", closeEodSummary);
   eodCopyBtn.addEventListener("click", copyEodText);
-  eodOverlay.addEventListener("click", (e) => {
-    if (e.target === eodOverlay) closeEodSummary();
-  });
+  eodOverlay.addEventListener("click", (e) => { if (e.target === eodOverlay) closeEodSummary(); });
 
   plusBtn.addEventListener("click", increment);
   minusBtn.addEventListener("click", decrement);
@@ -770,17 +843,14 @@
   document.getElementById("resetBtn").addEventListener("click", resetShift);
   document.getElementById("newShiftBtn").addEventListener("click", resetShift);
   editIntervalBtn.addEventListener("click", reopenLastInterval);
-  podSelect.addEventListener("change", () => {
-    state.pod = podSelect.value;
-    scheduleSave();
-  });
+  podSelect.addEventListener("change", () => { state.pod = podSelect.value; scheduleSave(); });
+  typeButtons.forEach(btn => btn.addEventListener("click", () => setActiveType(btn.dataset.type)));
 
   (function init() {
     loadState();
     render();
     saveIndicator.textContent = "Progress saved automatically";
   })();
-
 </script>
 </body>
 </html>
